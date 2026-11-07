@@ -28,6 +28,8 @@ from .const import (
     CONF_PHONE,
     CONF_PIN_HASH,
     CONF_SCAN_INTERVAL,
+    CONF_SESSION_TOKEN,
+    CONF_SESSION_UID,
     CONF_VIN,
     DEFAULT_ACTIVE_INTERVAL_MIN,
     DEFAULT_SCAN_INTERVAL_MIN,
@@ -37,7 +39,11 @@ from .const import (
     MIN_ACTIVE_INTERVAL_MIN,
     MIN_SCAN_INTERVAL_MIN,
     POST_COMMAND_REFRESH_DELAY,
+    WAKE_RETRIES,
+    WAKE_RETRY_DELAY_S,
 )
+
+_NOT_READY = "not ready"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,6 +83,11 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
             vin=entry.data.get(CONF_VIN),
             pin_hash=entry.data.get(CONF_PIN_HASH),
         )
+        # Reuse the saved session: MG India counts every fresh login against a
+        # daily quota. An expired session is refreshed by the client itself.
+        if entry.data.get(CONF_SESSION_UID) and entry.data.get(CONF_SESSION_TOKEN):
+            self.client.uid = entry.data[CONF_SESSION_UID]
+            self.client.token = entry.data[CONF_SESSION_TOKEN]
         self._lock = asyncio.Lock()
         self._capabilities_loaded = False
         self._cancel_refresh: Callable[[], None] | None = None
@@ -102,14 +113,47 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
                     except MgIndiaApiError as err:
                         _LOGGER.debug("Capability discovery failed: %s", err)
                     self._capabilities_loaded = True
-                status = await self.client.status(include_charge=vehicle.is_electric)
+                status = await self._status_with_wake(vehicle.is_electric)
             except MgIndiaLoginRejected as err:
                 raise ConfigEntryAuthFailed(str(err)) from err
             except (MgIndiaApiError, ValueError, TimeoutError) as err:
+                if _NOT_READY in str(err) and self.data is not None:
+                    # The car stayed asleep. Keep showing the last known values
+                    # (their "Last update from car" time shows their age) rather
+                    # than turning every entity unavailable.
+                    _LOGGER.info("MG car did not answer this refresh; keeping last data")
+                    self._save_session()
+                    return self.data
                 raise UpdateFailed(f"MG iSMART update failed: {err}") from err
+            self._save_session()
             snapshot = Snapshot(vehicle, self.client.capabilities, status)
             self._adapt_interval(snapshot)
             return snapshot
+
+    async def _status_with_wake(self, include_charge: bool):
+        """Read status, giving a deep-sleeping telematics unit time to wake."""
+        for attempt in range(WAKE_RETRIES + 1):
+            try:
+                return await self.client.status(include_charge=include_charge)
+            except MgIndiaApiError as err:
+                if _NOT_READY not in str(err) or attempt == WAKE_RETRIES:
+                    raise
+                _LOGGER.debug("MG car still waking (attempt %d); retrying", attempt + 1)
+                await asyncio.sleep(WAKE_RETRY_DELAY_S)
+        raise MgIndiaApiError("Vehicle status was not ready after polling")
+
+    def _save_session(self) -> None:
+        """Persist a new MG session so restarts reuse it instead of logging in."""
+        uid, token = self.client.uid, self.client.token
+        data = self.config_entry.data
+        if not uid or not token or (
+            data.get(CONF_SESSION_UID) == uid and data.get(CONF_SESSION_TOKEN) == token
+        ):
+            return
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            data={**data, CONF_SESSION_UID: uid, CONF_SESSION_TOKEN: token},
+        )
 
     def _adapt_interval(self, snapshot: Snapshot) -> None:
         """Poll often only while the car is awake anyway; protect a low 12 V battery."""

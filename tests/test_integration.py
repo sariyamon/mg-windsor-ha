@@ -174,6 +174,47 @@ async def test_low_12v_battery_saver(hass: HomeAssistant, mock_client) -> None:
     assert entry.runtime_data.battery_saver is False
 
 
+@pytest.fixture
+def no_wake_delay(monkeypatch):
+    monkeypatch.setattr("custom_components.mg_ismart_india.coordinator.WAKE_RETRY_DELAY_S", 0)
+
+
+async def test_sleeping_car_retried(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
+    from mg_ismart_india_client import MgIndiaApiError
+
+    mock_client.status.side_effect = [
+        MgIndiaApiError("Vehicle status was not ready after polling"),
+        make_status(),
+    ]
+    await _setup(hass)
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
+    assert mock_client.status.await_count == 2
+
+
+async def test_keeps_last_data_when_car_asleep(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
+    from mg_ismart_india_client import MgIndiaApiError
+
+    entry = await _setup(hass)
+    mock_client.status.side_effect = MgIndiaApiError("Vehicle status was not ready after polling")
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
+    assert entry.runtime_data.last_update_success
+
+
+async def test_session_saved_and_reused(hass: HomeAssistant, mock_client) -> None:
+    mock_client.uid, mock_client.token = "U1", "T1"
+    entry = await _setup(hass)
+    assert entry.data["session_uid"] == "U1" and entry.data["session_token"] == "T1"
+
+
+async def test_config_flow_stores_session(hass: HomeAssistant, mock_client) -> None:
+    mock_client.uid, mock_client.token = "U9", "T9"
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], USER)
+    assert result["data"]["session_token"] == "T9"
+
+
 async def test_old_short_interval_clamped(hass: HomeAssistant, mock_client) -> None:
     mock_client.status.return_value = make_status(charge=None)
     data = {CONF_PHONE: "9876543210", CONF_PASSWORD: "secret", CONF_VIN: VIN}

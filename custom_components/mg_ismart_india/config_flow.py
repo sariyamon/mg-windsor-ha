@@ -37,6 +37,8 @@ from .const import (
     CONF_PHONE,
     CONF_PIN_HASH,
     CONF_SCAN_INTERVAL,
+    CONF_SESSION_TOKEN,
+    CONF_SESSION_UID,
     CONF_VIN,
     DEFAULT_ACTIVE_INTERVAL_MIN,
     DEFAULT_SCAN_INTERVAL_MIN,
@@ -127,6 +129,10 @@ async def _validate(
         CONF_VIN: client.vehicle.vin,
         "title": f"MG {client.vehicle.model or client.vehicle.name}",
     }
+    if client.uid and client.token:
+        # Reuse this login's session at startup instead of logging in again.
+        data[CONF_SESSION_UID] = client.uid
+        data[CONF_SESSION_TOKEN] = client.token
     if pin_hash:
         data[CONF_PIN_HASH] = pin_hash
     return {}, data

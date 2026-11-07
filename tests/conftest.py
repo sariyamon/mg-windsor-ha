@@ -55,6 +55,8 @@ def mock_client():
     vehicle = Vehicle(vin=VIN, name="Windsor", brand="MG", model="Windsor", color_name="Clay Beige", series="EQ100")
     client = MagicMock()
     client.vehicle = None
+    client.uid = None
+    client.token = None
     client.has_pin = True
     client.capabilities = Capabilities(climate=True, door_lock=True, find_my_car=True, tailgate=True)
 
