@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from mg_ismart_india_client import MgIndiaCommandIndeterminate, MgIndiaLoginRejected, MgIndiaMfaRequired
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from datetime import timedelta
+
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_PIN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from custom_components.mg_ismart_india.const import CONF_PHONE, CONF_PIN_HASH, CONF_VIN, DOMAIN
 
@@ -59,7 +62,13 @@ async def _setup(hass: HomeAssistant, pin: bool = True) -> MockConfigEntry:
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+    await _pass_startup_delay(hass)
     return entry
+
+
+async def _pass_startup_delay(hass: HomeAssistant) -> None:
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=31))
+    await hass.async_block_till_done()
 
 
 async def test_entities(hass: HomeAssistant, mock_client) -> None:
@@ -122,7 +131,7 @@ async def test_auth_failure_starts_reauth(hass: HomeAssistant, mock_client) -> N
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    assert entry.state is config_entries.ConfigEntryState.SETUP_ERROR
+    await _pass_startup_delay(hass)
     flows = hass.config_entries.flow.async_progress()
     assert any(f["context"]["source"] == "reauth" for f in flows)
 
@@ -222,6 +231,7 @@ async def test_old_short_interval_clamped(hass: HomeAssistant, mock_client) -> N
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+    await _pass_startup_delay(hass)
     assert _interval(entry) == 15
 
 
@@ -294,3 +304,21 @@ async def test_restart_shows_saved_snapshot_while_car_asleep(hass: HomeAssistant
     await hass.async_block_till_done()
     assert entry.state is config_entries.ConfigEntryState.LOADED
     assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
+    await _pass_startup_delay(hass)
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
+
+
+async def test_startup_never_blocks_and_can_pause_first(hass: HomeAssistant, mock_client) -> None:
+    data = {CONF_PHONE: "9876543210", CONF_PASSWORD: "secret", CONF_VIN: VIN, CONF_PIN_HASH: "X" * 32}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=VIN, data=data, title="MG Windsor")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is config_entries.ConfigEntryState.LOADED
+    mock_client.status.assert_not_called()  # nothing sent yet
+    assert hass.states.get("sensor.mg_windsor_battery").state == "unknown"
+    # Pause inside the grace period: no login ever happens.
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    await _pass_startup_delay(hass)
+    mock_client.login.assert_not_called()
+    mock_client.status.assert_not_called()

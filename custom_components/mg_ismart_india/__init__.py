@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_call_later
 from mg_ismart_india_client import Capabilities, Snapshot, Status, Vehicle
 
 from .cache import SnapshotCache
-from .const import CONF_VIN
+from .const import CONF_VIN, STARTUP_REFRESH_DELAY
 from .coordinator import MgConfigEntry, MgCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,18 +38,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: MgConfigEntry) -> bool:
     coordinator = MgCoordinator(hass, entry)
     cached = await coordinator.cache.async_load()
 
-    if coordinator.paused:
-        # No network at all while paused: show the last known values.
-        coordinator.data = cached or _placeholder(entry)
-    elif cached is not None:
-        # Draw the dashboard from the saved snapshot at once, then refresh in
-        # the background so a slow or sleeping car never blocks startup.
-        coordinator.data = cached
-        entry.async_create_background_task(
-            hass, coordinator.async_refresh(), "mg_ismart_india first refresh"
+    # Never block startup on MG's servers: draw the dashboard from the saved
+    # snapshot (or an empty placeholder) at once. While paused, nothing else
+    # happens. Otherwise the first contact with MG waits STARTUP_REFRESH_DELAY,
+    # leaving time to switch Cloud sync off before any login is made.
+    coordinator.data = cached or _placeholder(entry)
+    if not coordinator.paused:
+
+        async def _first_refresh(_now: Any) -> None:
+            if not coordinator.paused:
+                await coordinator.async_refresh()
+
+        entry.async_on_unload(
+            async_call_later(hass, STARTUP_REFRESH_DELAY, _first_refresh)
         )
-    else:
-        await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

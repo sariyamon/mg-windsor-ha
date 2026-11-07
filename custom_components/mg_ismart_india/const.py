@@ -38,6 +38,9 @@ CONF_SESSION_TOKEN = "session_token"
 WAKE_RETRIES = 2
 WAKE_RETRY_DELAY_S = 20
 
+# First contact with MG after startup waits this long (never blocks startup).
+STARTUP_REFRESH_DELAY = timedelta(seconds=30)
+
 # After a remote command, give the car a moment before re-reading its status.
 POST_COMMAND_REFRESH_DELAY = timedelta(seconds=20)
 
