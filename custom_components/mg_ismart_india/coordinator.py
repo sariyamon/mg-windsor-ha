@@ -22,6 +22,7 @@ from mg_ismart_india_client import (
     MgIndiaLoginRejected,
     Snapshot,
 )
+from mg_ismart_india_client import client as _mg_client
 
 from .cache import SnapshotCache
 from .const import (
@@ -41,11 +42,16 @@ from .const import (
     MIN_ACTIVE_INTERVAL_MIN,
     MIN_SCAN_INTERVAL_MIN,
     POST_COMMAND_REFRESH_DELAY,
+    STATUS_POLL_ATTEMPTS,
     WAKE_RETRIES,
     WAKE_RETRY_DELAY_S,
 )
 
 _NOT_READY = "not ready"
+
+# Give a sleeping car longer to answer one status request (see const).
+if getattr(_mg_client, "STATUS_ATTEMPTS", 0) < STATUS_POLL_ATTEMPTS:
+    _mg_client.STATUS_ATTEMPTS = STATUS_POLL_ATTEMPTS
 
 _LOGGER = logging.getLogger(__name__)
 

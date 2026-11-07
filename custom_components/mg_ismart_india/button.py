@@ -70,8 +70,12 @@ class MgRefreshButton(MgEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
+        # Asking a sleeping car can take a minute; return at once and let the
+        # entities update when the answer arrives.
         self.coordinator._ensure_active("Refresh")
-        await self.coordinator.async_refresh()
+        self.coordinator.config_entry.async_create_background_task(
+            self.hass, self.coordinator.async_refresh(), "mg_ismart_india manual refresh"
+        )
 
 
 class MgCommandButton(MgEntity, ButtonEntity):

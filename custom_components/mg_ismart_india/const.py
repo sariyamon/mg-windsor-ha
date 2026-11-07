@@ -35,8 +35,12 @@ CONF_SESSION_TOKEN = "session_token"
 
 # A parked car's telematics unit can be in deep sleep and miss the client's
 # short answer window. Ask again after a pause before giving up.
-WAKE_RETRIES = 2
+WAKE_RETRIES = 1
 WAKE_RETRY_DELAY_S = 20
+# The client polls one status request for only ~15 s (10 x 1.5 s). Waking a
+# sleeping T-Box takes longer, and a new request restarts the wake-up, so keep
+# polling the same request for up to ~60 s, as the MG app does.
+STATUS_POLL_ATTEMPTS = 40
 
 # First contact with MG after startup waits this long (never blocks startup).
 STARTUP_REFRESH_DELAY = timedelta(seconds=30)

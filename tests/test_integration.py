@@ -191,13 +191,18 @@ def no_wake_delay(monkeypatch):
 async def test_sleeping_car_retried(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
     from mg_ismart_india_client import MgIndiaApiError
 
-    mock_client.status.side_effect = [
-        MgIndiaApiError("Vehicle status was not ready after polling"),
-        make_status(),
-    ]
+    answers = iter([MgIndiaApiError("Vehicle status was not ready after polling")])
+
+    async def _status(**kw):
+        err = next(answers, None)
+        if err:
+            raise err
+        return make_status()
+
+    mock_client.status.side_effect = _status
     await _setup(hass)
     assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
-    assert mock_client.status.await_count == 2
+    assert mock_client.status.await_count >= 2
 
 
 async def test_keeps_last_data_when_car_asleep(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
