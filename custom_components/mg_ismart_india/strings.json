@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect your MG (India)",
+        "description": "Sign in with the same details you use in the MG iSMART India app. Every login counts against MG's daily limit, so check the details before submitting.",
+        "data": {
+          "phone": "Mobile number",
+          "password": "MG app password",
+          "pin": "4-digit app PIN (optional)",
+          "vin": "VIN (optional)"
+        },
+        "data_description": {
+          "phone": "The 10-digit Indian mobile number registered in the MG app.",
+          "pin": "Needed for lock/unlock, air conditioning and find-my-car. Only a hash of it is stored.",
+          "vin": "Leave empty to use the first car on your account."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "MG rejected the saved login for {phone}. Enter the current MG app password.",
+        "data": {
+          "password": "MG app password",
+          "pin": "4-digit app PIN (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "MG rejected the mobile number or password.",
+      "mfa_required": "This MG account has two-step login turned on. Turn it off in the MG app and try again.",
+      "invalid_phone": "Enter a 10-digit Indian mobile number.",
+      "invalid_pin": "The PIN must be the 4-digit MG app PIN.",
+      "vin_not_found": "That VIN is not on this MG account.",
+      "no_vehicle": "No car was found on this MG account.",
+      "cannot_connect": "Could not reach the MG iSMART India service. Try again later.",
+      "unknown": "Unexpected error. Check the Home Assistant logs."
+    },
+    "abort": {
+      "already_configured": "This car is already set up.",
+      "reauth_successful": "Signed in again successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MG iSMART India options",
+        "data": {
+          "scan_interval": "Refresh every (minutes)",
+          "pin": "New 4-digit app PIN (leave empty to keep the current one)"
+        },
+        "data_description": {
+          "scan_interval": "Each refresh wakes the car's telematics unit; 10 minutes is a good balance."
+        }
+      }
+    },
+    "error": {
+      "invalid_pin": "The PIN must be the 4-digit MG app PIN."
+    }
+  }
+}
