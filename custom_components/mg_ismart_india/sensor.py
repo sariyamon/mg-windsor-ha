@@ -290,6 +290,24 @@ _SYNC_ICONS = {
 }
 
 
+_ERROR_STATES = {SYNC_NO_RESPONSE, SYNC_REJECTED, SYNC_LOGIN_FAILED, SYNC_ERROR, SYNC_TIMED_OUT}
+_STATE_MESSAGES = {
+    SYNC_OK: "Everything is fine. The last sync worked.",
+    SYNC_PAUSED: "Cloud sync is off. Nothing is sent to MG until you switch it on.",
+    SYNC_SCHEDULED: "Waiting for the next scheduled sync.",
+    SYNC_CONNECTING: "Logging in to MG.",
+    SYNC_WAITING: "Asking the car for its status. A sleeping car can take a minute.",
+    SYNC_COMMAND: "Sending your command to the car.",
+}
+
+
+def sync_message(state: str, error: str | None) -> str:
+    """A plain-language line for the dashboard, never empty."""
+    if state in _ERROR_STATES:
+        return error or "The last sync failed. It is retried automatically."
+    return _STATE_MESSAGES.get(state, error or "")
+
+
 class MgSyncStatusSensor(MgEntity, SensorEntity):
     """What the integration is doing right now, and how the last sync went."""
 
@@ -317,7 +335,7 @@ class MgSyncStatusSensor(MgEntity, SensorEntity):
             "last_attempt": c.last_attempt,
             "last_success": c.last_success,
             "next_refresh": c.next_refresh,
-            "message": c.last_error,
+            "message": sync_message(c.sync_state, c.last_error),
             "refresh_interval_min": None
             if c.update_interval is None
             else int(c.update_interval.total_seconds() // 60),

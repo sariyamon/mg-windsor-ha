@@ -1,0 +1,26 @@
+# A Car view built from the integration's cards. No entity IDs to fill in.
+# Dashboard → ⋮ → Edit dashboard → ⋮ → Raw configuration editor, paste under "views:".
+# With more than one car, add `device: <device id>` to each card (or pick it in the card editor).
+
+title: Car
+path: car
+icon: mdi:car-electric
+type: sections
+max_columns: 4
+sections:
+  - type: grid
+    cards:
+      - type: custom:mg-car-overview-card
+  - type: grid
+    cards:
+      - type: custom:mg-car-controls-card
+  - type: grid
+    cards:
+      - type: custom:mg-car-status-card
+  - type: grid
+    cards:
+      - type: custom:mg-car-health-card
+  - type: grid
+    column_span: 2
+    cards:
+      - type: custom:mg-car-location-card

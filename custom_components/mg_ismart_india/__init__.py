@@ -7,12 +7,16 @@ from typing import Any
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 from mg_ismart_india_client import Capabilities, Snapshot, Status, Vehicle
 
 from .cache import SnapshotCache
-from .const import CONF_VIN, STARTUP_REFRESH_DELAY
+from .const import CONF_VIN, DOMAIN, STARTUP_REFRESH_DELAY
 from .coordinator import MgConfigEntry, MgCoordinator
+from .frontend import async_register_frontend
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +28,14 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.SWITCH,
 ]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the dashboard cards once, for all cars."""
+    integration = await async_get_integration(hass, DOMAIN)
+    await async_register_frontend(hass, str(integration.version or "dev"))
+    return True
 
 
 def _placeholder(entry: MgConfigEntry) -> Snapshot:

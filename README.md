@@ -38,7 +38,7 @@ MG iSMART India allows **only one active login per account**. While this integra
 
 ## Sync status
 
-The **Sync status** sensor shows what the integration is doing: *Paused*, *Scheduled*, *Connecting*, *Waiting for car*, *Sending command*, *Up to date*, *Car not responding*, *Timed out*, *Rejected by MG*, *Login failed* or *Error*. Its attributes show the last attempt, last success, next refresh, refresh interval and the last error in plain words.
+The **Sync status** sensor shows what the integration is doing: *Paused*, *Scheduled*, *Connecting*, *Waiting for car*, *Sending command*, *Up to date*, *Car not responding*, *Timed out*, *Rejected by MG*, *Login failed* or *Error*. Its attributes show the last attempt, last success, next refresh, refresh interval and a **message** in plain words: what is happening now, or why the last sync failed.
 
 - While a sync or command is running, the lock, A/C and command buttons are disabled so requests are not repeated; **Cloud sync** stays usable so you can always pause.
 - Every sync and command stops after the **sync timeout** (default 180 s, Configure → 60–300 s).
@@ -62,6 +62,31 @@ How the integration protects the battery automatically:
 - The **Refresh status** button asks for fresh data on demand, so there is no need for a short interval just to check the car occasionally.
 
 Change the intervals under **Settings → Devices & services → MG iSMART India → Configure**.
+
+## Dashboard cards
+
+The integration comes with five ready-made cards, one for each section of a car view. They load automatically, with no extra download or resource to add.
+
+**Edit dashboard → Add card → search "MG car"**, then pick the one you want:
+
+| Card | Shows |
+|---|---|
+| **MG car overview** | Battery gauge, range, energy in the pack, charger and charging; charging power and "Full at" only while charging |
+| **MG car controls** | Cloud sync switch, sync status and details, door lock, air conditioning, Find my car (asks first) and Refresh now |
+| **MG car status** | Doors, windows, boot, bonnet, cabin and outside temperature |
+| **MG car health** | Tyre pressures, 12 V battery, odometer |
+| **MG car location** | Map of the car's last GPS position |
+
+Each card finds the car's entities by itself, so there are no entity IDs to fill in, and it keeps working if you rename entities. Buttons and controls your car doesn't support are left out. The cards are made from Home Assistant's own tile, gauge, map and entities cards, so they follow your theme.
+
+| Option | Card | Default |
+|---|---|---|
+| `device` | all | the first car |
+| `title` | all | the car's name, Controls, Status, Health, Location |
+| `show_details` | controls | on (the Details, Last successful sync and Next refresh rows) |
+| `default_zoom` | location | 15 |
+
+A whole Car view made of these cards: [examples/car-cards.yaml](examples/car-cards.yaml).
 
 ## Disclaimer
 

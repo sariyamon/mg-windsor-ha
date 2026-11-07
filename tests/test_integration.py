@@ -358,7 +358,7 @@ async def test_sync_status_up_to_date(hass: HomeAssistant, mock_client) -> None:
     st = hass.states.get("sensor.mg_windsor_sync_status")
     assert st.state == "up_to_date"
     assert st.attributes["last_success"] is not None
-    assert st.attributes["message"] is None
+    assert st.attributes["message"] == "Everything is fine. The last sync worked."
 
 
 async def test_sync_status_rejected_backs_off_and_keeps_data(hass: HomeAssistant, mock_client) -> None:
@@ -458,3 +458,34 @@ async def test_command_timeout(hass: HomeAssistant, mock_client) -> None:
         await hass.services.async_call("lock", "unlock", {"entity_id": "lock.mg_windsor_doors"}, blocking=True)
     assert not entry.runtime_data.busy
     assert hass.states.get("lock.mg_windsor_doors").state == "locked"
+
+
+async def test_cards_find_entities_by_key(hass: HomeAssistant, mock_client, hass_ws_client) -> None:
+    """The dashboard cards get key -> entity_id, also after an entity is renamed."""
+    from homeassistant.helpers import entity_registry as er
+
+    entry = await _setup(hass)
+    er.async_get(hass).async_update_entity("sensor.mg_windsor_range", new_entity_id="sensor.windsor_range")
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "mg_ismart_india/devices"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    [car] = msg["result"]["devices"]
+    assert car["entry_id"] == entry.entry_id
+    assert car["device_id"]
+    e = car["entities"]
+    assert e["range"] == "sensor.windsor_range"
+    assert e["battery"] == "sensor.mg_windsor_battery"
+    assert e["door_lock"] == "lock.mg_windsor_doors"
+    assert e["location"] == "device_tracker.mg_windsor_location"
+    assert e["sync_status"] == "sensor.mg_windsor_sync_status"
+
+
+def test_cards_file_is_shipped() -> None:
+    from custom_components.mg_ismart_india.frontend import CARDS_FILE
+
+    text = CARDS_FILE.read_text()
+    for tag in ("overview", "controls", "status", "health", "location"):
+        assert f'"mg-car-{tag}-card"' in text
