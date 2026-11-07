@@ -223,3 +223,74 @@ async def test_old_short_interval_clamped(hass: HomeAssistant, mock_client) -> N
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert _interval(entry) == 15
+
+
+async def test_pause_stops_all_contact(hass: HomeAssistant, mock_client) -> None:
+    entry = await _setup(hass)
+    assert hass.states.get("switch.mg_windsor_cloud_sync").state == "on"
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    assert entry.options["sync_paused"] is True
+    assert hass.states.get("switch.mg_windsor_cloud_sync").state == "off"
+    calls = mock_client.status.await_count
+    await entry.runtime_data.async_refresh()
+    assert mock_client.status.await_count == calls  # no network while paused
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"  # last value kept
+    with pytest.raises(HomeAssistantError, match="paused"):
+        await hass.services.async_call("lock", "unlock", {"entity_id": "lock.mg_windsor_doors"}, blocking=True)
+    with pytest.raises(HomeAssistantError, match="paused"):
+        await hass.services.async_call("button", "press", {"entity_id": "button.mg_windsor_refresh_status"}, blocking=True)
+    mock_client.control_door_lock.assert_not_called()
+    # Resume refreshes straight away.
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    await hass.async_block_till_done()
+    assert entry.options["sync_paused"] is False
+    assert mock_client.status.await_count == calls + 1
+
+
+async def test_paused_restart_never_logs_in(hass: HomeAssistant, mock_client) -> None:
+    data = {CONF_PHONE: "9876543210", CONF_PASSWORD: "secret", CONF_VIN: VIN, CONF_PIN_HASH: "X" * 32}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=VIN, data=data, title="MG Windsor", options={"sync_paused": True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    mock_client.login.assert_not_called()
+    mock_client.vehicles.assert_not_called()
+    mock_client.status.assert_not_called()
+    assert hass.states.get("switch.mg_windsor_cloud_sync").state == "off"
+    assert hass.states.get("sensor.mg_windsor_battery") is not None
+
+
+async def test_cache_round_trip() -> None:
+    from mg_ismart_india_client import Capabilities, Snapshot, Vehicle
+
+    from custom_components.mg_ismart_india.cache import deserialize, serialize
+
+    snap = Snapshot(
+        Vehicle(vin=VIN, name="Windsor", model="Windsor", raw={"configuration": {"EV": "1"}}),
+        Capabilities(tailgate=True, window_param_ids=(8, 9)),
+        make_status(),
+    )
+    back = deserialize(serialize(snap))
+    assert back.vehicle.is_electric and back.vehicle.vin == VIN
+    assert back.capabilities.window_param_ids == (8, 9)
+    assert back.status.charge.soc == 72.0 and back.status.gps.has_fix
+    assert back.battery_soc == 72.0
+
+
+async def test_restart_shows_saved_snapshot_while_car_asleep(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
+    from mg_ismart_india_client import MgIndiaApiError
+
+    entry = await _setup(hass)
+    await hass.async_block_till_done()
+    # Flush the delayed save, then restart with a car that will not answer.
+    from custom_components.mg_ismart_india.cache import serialize
+    from homeassistant.helpers.storage import Store
+
+    await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.last_snapshot").async_save(serialize(entry.runtime_data.data))
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    mock_client.vehicle = None
+    mock_client.status.side_effect = MgIndiaApiError("Vehicle status was not ready after polling")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is config_entries.ConfigEntryState.LOADED
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"

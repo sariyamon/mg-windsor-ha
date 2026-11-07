@@ -29,6 +29,13 @@ The European MG / SAIC integrations do not work in India: MG India runs its own 
 - Charging details appear only when the car sends a charging frame (plugged in, or recently charged); otherwise battery % comes from the main status.
 - Shared (secondary) MG accounts may not receive charging data — MG restricts it to the owner account.
 
+## One login per account, and pausing sync
+
+MG iSMART India allows **only one active login per account**. While this integration is syncing, the MG phone app on the same account gets logged out (and logging back in on the phone ends the integration's session).
+
+- **Best setup:** in the MG app, share the car with a **secondary user** (a different mobile number) and connect Home Assistant with that account. Your phone keeps the owner login. MG may not send charging details (power, time remaining) or allow remote commands for secondary users; battery %, range, lock state, doors, tyres and location still work.
+- **Cloud sync switch:** turn **Cloud sync** off (on the device page, or **Configure → Pause cloud sync**) to stop all contact with MG – no refresh, no login, no commands. The last known values stay on the dashboard, and the pause survives restarts. Turn it back on to resume with a fresh update.
+
 ## Refresh interval and 12 V battery
 
 > **Please use the recommended intervals.** Every refresh makes MG's server wake the car's telematics unit (T-Box), which runs from the small **12 V battery**, not the main traction battery. Refreshing a parked car too often can drain the 12 V battery and leave the car unable to start.

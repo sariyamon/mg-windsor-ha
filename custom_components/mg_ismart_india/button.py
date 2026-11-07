@@ -70,6 +70,7 @@ class MgRefreshButton(MgEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
+        self.coordinator._ensure_active("Refresh")
         await self.coordinator.async_refresh()
 
 

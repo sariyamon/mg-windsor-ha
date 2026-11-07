@@ -23,8 +23,10 @@ from mg_ismart_india_client import (
     Snapshot,
 )
 
+from .cache import SnapshotCache
 from .const import (
     CONF_ACTIVE_INTERVAL,
+    CONF_PAUSED,
     CONF_PHONE,
     CONF_PIN_HASH,
     CONF_SCAN_INTERVAL,
@@ -69,13 +71,15 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
             MIN_ACTIVE_INTERVAL_MIN,
         )
         self.battery_saver = False
+        self.paused: bool = bool(entry.options.get(CONF_PAUSED, False))
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=timedelta(minutes=self.parked_minutes),
+            update_interval=None if self.paused else timedelta(minutes=self.parked_minutes),
         )
+        self.cache = SnapshotCache(hass, entry.entry_id)
         self.client = MgIndiaClient(
             async_get_clientsession(hass),
             phone=entry.data[CONF_PHONE],
@@ -97,7 +101,37 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
         """True when remote commands are configured."""
         return self.client.has_pin
 
+    async def async_set_paused(self, paused: bool) -> None:
+        """Pause or resume all contact with MG's servers (persists across restarts)."""
+        entry = self.config_entry
+        self.paused = paused
+        self.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_PAUSED: paused}
+        )
+        if paused:
+            if self._cancel_refresh:
+                self._cancel_refresh()
+                self._cancel_refresh = None
+            self.update_interval = None
+            _LOGGER.info("MG cloud sync paused; no further requests will be sent")
+            self.async_update_listeners()
+        else:
+            self.update_interval = timedelta(minutes=self.parked_minutes)
+            _LOGGER.info("MG cloud sync resumed")
+            await self.async_request_refresh()
+
+    def _ensure_active(self, label: str) -> None:
+        if self.paused:
+            raise HomeAssistantError(
+                f"{label}: cloud sync is paused. Turn on 'Cloud sync' to contact the car."
+            )
+
     async def _async_update_data(self) -> Snapshot:
+        if self.paused:
+            # Never touch the network while paused, not even for a manual refresh.
+            if self.data is None:
+                raise UpdateFailed("Cloud sync is paused and no saved data is available yet")
+            return self.data
         async with self._lock:
             try:
                 if self.client.vehicle is None:
@@ -128,6 +162,7 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
             self._save_session()
             snapshot = Snapshot(vehicle, self.client.capabilities, status)
             self._adapt_interval(snapshot)
+            self.cache.save(snapshot)
             return snapshot
 
     async def _status_with_wake(self, include_charge: bool):
@@ -157,6 +192,9 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
 
     def _adapt_interval(self, snapshot: Snapshot) -> None:
         """Poll often only while the car is awake anyway; protect a low 12 V battery."""
+        if self.paused:
+            self.update_interval = None
+            return
         status = snapshot.status
         charge = status.charge
         awake = bool(charge is not None and charge.is_charging) or bool(
@@ -186,6 +224,7 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
         self, label: str, command: Callable[[], Awaitable[Any]]
     ) -> None:
         """Run a remote command, then refresh the status shortly after."""
+        self._ensure_active(label)
         if not self.has_pin:
             raise HomeAssistantError(
                 "Remote commands need the 4-digit MG app PIN; add it in the integration options"

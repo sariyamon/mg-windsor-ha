@@ -11,6 +11,9 @@ CONF_VIN = "vin"
 CONF_PIN_HASH = "pin_hash"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ACTIVE_INTERVAL = "active_scan_interval"
+# Cloud sync paused: no polling and no logins (MG India allows one login per
+# account, so syncing logs the phone app out). Last known values stay shown.
+CONF_PAUSED = "sync_paused"
 
 # Every poll makes MG's server wake the car's telematics unit (T-Box), which
 # runs from the 12 V battery. Polling a parked car too often can drain it.

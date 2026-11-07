@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/john-lazarus/mg-ismart-india-client/issues",
   "loggers": ["mg_ismart_india_client"],
   "requirements": ["mg-ismart-india-client==0.3.0"],
-  "version": "1.1.1"
+  "version": "1.2.0"
 }

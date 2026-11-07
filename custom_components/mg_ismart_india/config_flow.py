@@ -16,6 +16,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_PIN
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -34,6 +35,7 @@ from mg_ismart_india_client.crypto import normalize_phone
 
 from .const import (
     CONF_ACTIVE_INTERVAL,
+    CONF_PAUSED,
     CONF_PHONE,
     CONF_PIN_HASH,
     CONF_SCAN_INTERVAL,
@@ -48,7 +50,6 @@ from .const import (
     MIN_ACTIVE_INTERVAL_MIN,
     MIN_SCAN_INTERVAL_MIN,
 )
-
 from .coordinator import MgConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -235,6 +236,7 @@ class MgOptionsFlow(OptionsFlowWithReload):
                             int(user_input[CONF_ACTIVE_INTERVAL]),
                             MIN_ACTIVE_INTERVAL_MIN,
                         ),
+                        CONF_PAUSED: bool(user_input.get(CONF_PAUSED, False)),
                     }
                 )
         schema = vol.Schema(
@@ -252,6 +254,9 @@ class MgOptionsFlow(OptionsFlowWithReload):
                         CONF_ACTIVE_INTERVAL, DEFAULT_ACTIVE_INTERVAL_MIN
                     ),
                 ): _minutes(MIN_ACTIVE_INTERVAL_MIN, MAX_ACTIVE_INTERVAL_MIN),
+                vol.Required(
+                    CONF_PAUSED, default=bool(entry.options.get(CONF_PAUSED, False))
+                ): BooleanSelector(),
                 vol.Optional(CONF_PIN): _PASSWORD,
             }
         )
