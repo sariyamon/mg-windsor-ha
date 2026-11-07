@@ -69,10 +69,17 @@ class MgRefreshButton(MgEntity, ButtonEntity):
     _attr_icon = "mdi:refresh"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
+    @property
+    def available(self) -> bool:
+        # Greyed out while a sync or command is in progress, to avoid repeats.
+        return super().available and not self.coordinator.busy
+
     async def async_press(self) -> None:
         # Asking a sleeping car can take a minute; return at once and let the
         # entities update when the answer arrives.
         self.coordinator._ensure_active("Refresh")
+        if self.coordinator.busy:
+            return  # already syncing; the result will show when it finishes
         self.coordinator.config_entry.async_create_background_task(
             self.hass, self.coordinator.async_refresh(), "mg_ismart_india manual refresh"
         )
@@ -80,6 +87,11 @@ class MgRefreshButton(MgEntity, ButtonEntity):
 
 class MgCommandButton(MgEntity, ButtonEntity):
     entity_description: MgButtonDescription
+
+    @property
+    def available(self) -> bool:
+        # Greyed out while a sync or command is in progress, to avoid repeats.
+        return super().available and not self.coordinator.busy
 
     def __init__(self, coordinator: MgCoordinator, description: MgButtonDescription) -> None:
         super().__init__(coordinator, description.key)

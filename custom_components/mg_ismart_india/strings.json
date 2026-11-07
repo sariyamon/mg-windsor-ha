@@ -49,17 +49,59 @@
           "scan_interval": "Refresh while parked (minutes)",
           "active_scan_interval": "Refresh while charging or A/C is on (minutes)",
           "pin": "New 4-digit app PIN (leave empty to keep the current one)",
-          "sync_paused": "Pause cloud sync"
+          "sync_paused": "Pause cloud sync",
+          "sync_timeout": "Sync timeout (seconds)"
         },
         "data_description": {
           "scan_interval": "Recommended 30 (minimum 15). Longer is gentler on the 12 V battery; 60 is ideal if the car is parked for days.",
           "active_scan_interval": "Recommended 10. The car is already awake while charging or cooling, so this costs no extra battery.",
-          "sync_paused": "Stops all contact with MG: no refresh, no login, no remote commands. MG India allows one login per account, so while sync is on the MG phone app gets logged out. The last known values stay on the dashboard. Also available as the 'Cloud sync' switch."
+          "sync_paused": "Stops all contact with MG: no refresh, no login, no remote commands. MG India allows one login per account, so while sync is on the MG phone app gets logged out. The last known values stay on the dashboard. Also available as the 'Cloud sync' switch.",
+          "sync_timeout": "The longest one sync or remote command may take before it gives up (default 180). Waking a sleeping car can take over a minute."
         }
       }
     },
     "error": {
       "invalid_pin": "The PIN must be the 4-digit MG app PIN."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "sync_status": {
+        "name": "Sync status",
+        "state": {
+          "paused": "Paused",
+          "scheduled": "Scheduled",
+          "connecting": "Connecting",
+          "waiting_for_car": "Waiting for car",
+          "up_to_date": "Up to date",
+          "car_not_responding": "Car not responding",
+          "rejected": "Rejected by MG",
+          "login_failed": "Login failed",
+          "error": "Error",
+          "sending_command": "Sending command",
+          "timed_out": "Timed out"
+        },
+        "state_attributes": {
+          "last_attempt": {
+            "name": "Last attempt"
+          },
+          "last_success": {
+            "name": "Last success"
+          },
+          "next_refresh": {
+            "name": "Next refresh"
+          },
+          "message": {
+            "name": "Message"
+          },
+          "refresh_interval_min": {
+            "name": "Refresh interval (min)"
+          },
+          "battery_saver": {
+            "name": "12 V battery saver"
+          }
+        }
+      }
     }
   }
 }

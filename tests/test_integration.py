@@ -327,3 +327,134 @@ async def test_startup_never_blocks_and_can_pause_first(hass: HomeAssistant, moc
     await _pass_startup_delay(hass)
     mock_client.login.assert_not_called()
     mock_client.status.assert_not_called()
+
+
+async def _count_refreshes(hass, entry, seconds: int) -> int:
+    """Advance the clock and count how many real status requests were sent."""
+    client = entry.runtime_data.client
+    before = client.status.await_count
+    now = dt_util.utcnow()
+    for i in range(1, seconds // 20 + 1):
+        async_fire_time_changed(hass, now + timedelta(seconds=20 * i))
+        await hass.async_block_till_done()
+    return client.status.await_count - before
+
+
+async def test_no_refresh_loop_regression(hass: HomeAssistant, mock_client) -> None:
+    """Regression: a refresh must not schedule another one 20 s later."""
+    mock_client.status.return_value = make_status(charge=None)
+    entry = await _setup(hass)
+    assert await _count_refreshes(hass, entry, 600) == 0  # 10 min, parked = 30 min
+
+
+async def test_paused_never_refreshes(hass: HomeAssistant, mock_client) -> None:
+    entry = await _setup(hass)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    assert await _count_refreshes(hass, entry, 3600) == 0
+
+
+async def test_sync_status_up_to_date(hass: HomeAssistant, mock_client) -> None:
+    await _setup(hass)
+    st = hass.states.get("sensor.mg_windsor_sync_status")
+    assert st.state == "up_to_date"
+    assert st.attributes["last_success"] is not None
+    assert st.attributes["message"] is None
+
+
+async def test_sync_status_rejected_backs_off_and_keeps_data(hass: HomeAssistant, mock_client) -> None:
+    from mg_ismart_india_client import MgIndiaApiError
+
+    entry = await _setup(hass)
+    mock_client.status.side_effect = MgIndiaApiError("Status failed: result 7")
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    st = hass.states.get("sensor.mg_windsor_sync_status")
+    assert st.state == "rejected"
+    assert "result 7" in st.attributes["message"]
+    assert st.attributes["refresh_interval_min"] == 60
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"  # not unavailable
+
+
+async def test_sync_status_car_not_responding(hass: HomeAssistant, mock_client, no_wake_delay) -> None:
+    from mg_ismart_india_client import MgIndiaApiError
+
+    entry = await _setup(hass)
+    mock_client.status.side_effect = MgIndiaApiError("Vehicle status was not ready after polling")
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.mg_windsor_sync_status").state == "car_not_responding"
+
+
+async def test_sync_status_paused(hass: HomeAssistant, mock_client) -> None:
+    await _setup(hass)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    st = hass.states.get("sensor.mg_windsor_sync_status")
+    assert st.state == "paused"
+    assert st.attributes["next_refresh"] is None
+
+
+async def test_sync_timeout(hass: HomeAssistant, mock_client) -> None:
+    import asyncio
+
+    entry = await _setup(hass)
+    entry.runtime_data.sync_timeout = 0.05
+
+    async def _hang(**kw):
+        await asyncio.sleep(10)
+
+    mock_client.status.side_effect = _hang
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    st = hass.states.get("sensor.mg_windsor_sync_status")
+    assert st.state == "timed_out"
+    assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"
+    assert hass.states.get("lock.mg_windsor_doors").state == "locked"  # re-enabled after
+
+
+async def test_controls_disabled_while_syncing(hass: HomeAssistant, mock_client) -> None:
+    import asyncio
+
+    entry = await _setup(hass)
+    coordinator = entry.runtime_data
+    release = asyncio.Event()
+
+    async def _slow(**kw):
+        await release.wait()
+        return make_status()
+
+    mock_client.status.side_effect = _slow
+    task = hass.async_create_task(coordinator.async_refresh())
+    await asyncio.sleep(0)
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert coordinator.busy
+    assert hass.states.get("sensor.mg_windsor_sync_status").state == "waiting_for_car"
+    assert hass.states.get("lock.mg_windsor_doors").state == "unavailable"
+    assert hass.states.get("button.mg_windsor_find_my_car").state == "unavailable"
+    assert hass.states.get("switch.mg_windsor_cloud_sync").state == "on"  # can still pause
+    # Extra refresh requests are ignored while busy.
+    calls = mock_client.status.await_count
+    await coordinator.async_request_refresh()
+    assert mock_client.status.await_count == calls
+    release.set()
+    await task
+    await hass.async_block_till_done()
+    assert not coordinator.busy
+    assert hass.states.get("lock.mg_windsor_doors").state == "locked"
+    assert hass.states.get("sensor.mg_windsor_sync_status").state == "up_to_date"
+
+
+async def test_command_timeout(hass: HomeAssistant, mock_client) -> None:
+    import asyncio
+
+    entry = await _setup(hass)
+    entry.runtime_data.sync_timeout = 0.05
+
+    async def _hang(*a):
+        await asyncio.sleep(10)
+
+    mock_client.control_door_lock.side_effect = _hang
+    with pytest.raises(HomeAssistantError, match="did not answer within"):
+        await hass.services.async_call("lock", "unlock", {"entity_id": "lock.mg_windsor_doors"}, blocking=True)
+    assert not entry.runtime_data.busy
+    assert hass.states.get("lock.mg_windsor_doors").state == "locked"

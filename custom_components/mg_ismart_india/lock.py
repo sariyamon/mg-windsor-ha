@@ -26,6 +26,11 @@ class MgDoorLock(MgEntity, LockEntity):
     _attr_name = "Doors"
 
     @property
+    def available(self) -> bool:
+        # Greyed out while a sync or command is in progress, to avoid repeats.
+        return super().available and not self.coordinator.busy
+
+    @property
     def is_locked(self) -> bool | None:
         return self.snapshot.status.locked
 

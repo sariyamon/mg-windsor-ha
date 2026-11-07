@@ -29,6 +29,20 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 from mg_ismart_india_client import Snapshot
 
+from .const import (
+    SYNC_COMMAND,
+    SYNC_CONNECTING,
+    SYNC_ERROR,
+    SYNC_LOGIN_FAILED,
+    SYNC_NO_RESPONSE,
+    SYNC_OK,
+    SYNC_PAUSED,
+    SYNC_REJECTED,
+    SYNC_SCHEDULED,
+    SYNC_STATES,
+    SYNC_TIMED_OUT,
+    SYNC_WAITING,
+)
 from .coordinator import MgConfigEntry
 from .entity import MgEntity
 
@@ -242,9 +256,11 @@ async def async_setup_entry(
 ) -> None:
     coordinator = entry.runtime_data
     is_ev = coordinator.data.vehicle.is_electric
-    async_add_entities(
+    entities: list[SensorEntity] = [
         MgSensor(coordinator, d) for d in SENSORS if is_ev or not d.ev_only
-    )
+    ]
+    entities.append(MgSyncStatusSensor(coordinator, "sync_status"))
+    async_add_entities(entities)
 
 
 class MgSensor(MgEntity, SensorEntity):
@@ -257,3 +273,53 @@ class MgSensor(MgEntity, SensorEntity):
     @property
     def native_value(self) -> Value:
         return self.entity_description.value_fn(self.snapshot)
+
+
+_SYNC_ICONS = {
+    SYNC_TIMED_OUT: "mdi:timer-alert-outline",
+    SYNC_COMMAND: "mdi:remote",
+    SYNC_PAUSED: "mdi:cloud-off-outline",
+    SYNC_SCHEDULED: "mdi:cloud-clock-outline",
+    SYNC_CONNECTING: "mdi:cloud-sync-outline",
+    SYNC_WAITING: "mdi:car-clock",
+    SYNC_OK: "mdi:cloud-check-outline",
+    SYNC_NO_RESPONSE: "mdi:car-off",
+    SYNC_REJECTED: "mdi:cloud-cancel-outline",
+    SYNC_LOGIN_FAILED: "mdi:account-alert-outline",
+    SYNC_ERROR: "mdi:cloud-alert-outline",
+}
+
+
+class MgSyncStatusSensor(MgEntity, SensorEntity):
+    """What the integration is doing right now, and how the last sync went."""
+
+    _attr_translation_key = "sync_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = SYNC_STATES
+
+    @property
+    def available(self) -> bool:
+        # Always readable, especially when syncing fails.
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.sync_state
+
+    @property
+    def icon(self) -> str:
+        return _SYNC_ICONS.get(self.coordinator.sync_state, "mdi:cloud-question-outline")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        c = self.coordinator
+        return {
+            "last_attempt": c.last_attempt,
+            "last_success": c.last_success,
+            "next_refresh": c.next_refresh,
+            "message": c.last_error,
+            "refresh_interval_min": None
+            if c.update_interval is None
+            else int(c.update_interval.total_seconds() // 60),
+            "battery_saver": c.battery_saver,
+        }

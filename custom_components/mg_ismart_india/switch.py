@@ -64,6 +64,11 @@ class MgClimateSwitch(MgEntity, SwitchEntity):
     _attr_icon = "mdi:air-conditioner"
 
     @property
+    def available(self) -> bool:
+        # Greyed out while a sync or command is in progress, to avoid repeats.
+        return super().available and not self.coordinator.busy
+
+    @property
     def is_on(self) -> bool | None:
         return self.snapshot.status.climate_running
 

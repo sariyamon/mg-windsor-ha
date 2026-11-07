@@ -41,14 +41,18 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONF_SESSION_TOKEN,
     CONF_SESSION_UID,
+    CONF_SYNC_TIMEOUT,
     CONF_VIN,
     DEFAULT_ACTIVE_INTERVAL_MIN,
     DEFAULT_SCAN_INTERVAL_MIN,
+    DEFAULT_SYNC_TIMEOUT_S,
     DOMAIN,
     MAX_ACTIVE_INTERVAL_MIN,
     MAX_SCAN_INTERVAL_MIN,
+    MAX_SYNC_TIMEOUT_S,
     MIN_ACTIVE_INTERVAL_MIN,
     MIN_SCAN_INTERVAL_MIN,
+    MIN_SYNC_TIMEOUT_S,
 )
 from .coordinator import MgConfigEntry
 
@@ -237,6 +241,10 @@ class MgOptionsFlow(OptionsFlowWithReload):
                             MIN_ACTIVE_INTERVAL_MIN,
                         ),
                         CONF_PAUSED: bool(user_input.get(CONF_PAUSED, False)),
+                        CONF_SYNC_TIMEOUT: min(
+                            max(int(user_input[CONF_SYNC_TIMEOUT]), MIN_SYNC_TIMEOUT_S),
+                            MAX_SYNC_TIMEOUT_S,
+                        ),
                     }
                 )
         schema = vol.Schema(
@@ -254,6 +262,15 @@ class MgOptionsFlow(OptionsFlowWithReload):
                         CONF_ACTIVE_INTERVAL, DEFAULT_ACTIVE_INTERVAL_MIN
                     ),
                 ): _minutes(MIN_ACTIVE_INTERVAL_MIN, MAX_ACTIVE_INTERVAL_MIN),
+                vol.Required(
+                    CONF_SYNC_TIMEOUT,
+                    default=entry.options.get(CONF_SYNC_TIMEOUT, DEFAULT_SYNC_TIMEOUT_S),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_SYNC_TIMEOUT_S, max=MAX_SYNC_TIMEOUT_S, step=10,
+                        unit_of_measurement="s", mode=NumberSelectorMode.BOX,
+                    )
+                ),
                 vol.Required(
                     CONF_PAUSED, default=bool(entry.options.get(CONF_PAUSED, False))
                 ): BooleanSelector(),

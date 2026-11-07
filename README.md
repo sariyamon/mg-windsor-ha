@@ -36,6 +36,15 @@ MG iSMART India allows **only one active login per account**. While this integra
 - **Best setup:** in the MG app, share the car with a **secondary user** (a different mobile number) and connect Home Assistant with that account. Your phone keeps the owner login. MG may not send charging details (power, time remaining) or allow remote commands for secondary users; battery %, range, lock state, doors, tyres and location still work.
 - **Cloud sync switch:** turn **Cloud sync** off (on the device page, or **Configure → Pause cloud sync**) to stop all contact with MG – no refresh, no login, no commands. The last known values stay on the dashboard, and the pause survives restarts. Turn it back on to resume with a fresh update.
 
+## Sync status
+
+The **Sync status** sensor shows what the integration is doing: *Paused*, *Scheduled*, *Connecting*, *Waiting for car*, *Sending command*, *Up to date*, *Car not responding*, *Timed out*, *Rejected by MG*, *Login failed* or *Error*. Its attributes show the last attempt, last success, next refresh, refresh interval and the last error in plain words.
+
+- While a sync or command is running, the lock, A/C and command buttons are disabled so requests are not repeated; **Cloud sync** stays usable so you can always pause.
+- Every sync and command stops after the **sync timeout** (default 180 s, Configure → 60–300 s).
+- If MG refuses a request outright, the integration waits 60 minutes before trying again.
+- When a refresh fails, the last known values stay on the dashboard instead of turning unavailable.
+
 ## Refresh interval and 12 V battery
 
 > **Please use the recommended intervals.** Every refresh makes MG's server wake the car's telematics unit (T-Box), which runs from the small **12 V battery**, not the main traction battery. Refreshing a parked car too often can drain the 12 V battery and leave the car unable to start.

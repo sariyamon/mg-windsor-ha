@@ -14,6 +14,11 @@ CONF_ACTIVE_INTERVAL = "active_scan_interval"
 # Cloud sync paused: no polling and no logins (MG India allows one login per
 # account, so syncing logs the phone app out). Last known values stay shown.
 CONF_PAUSED = "sync_paused"
+# Hard limit for one sync or one remote command, so nothing runs forever.
+CONF_SYNC_TIMEOUT = "sync_timeout"
+DEFAULT_SYNC_TIMEOUT_S = 180
+MIN_SYNC_TIMEOUT_S = 60
+MAX_SYNC_TIMEOUT_S = 300
 
 # Every poll makes MG's server wake the car's telematics unit (T-Box), which
 # runs from the 12 V battery. Polling a parked car too often can drain it.
@@ -49,3 +54,33 @@ STARTUP_REFRESH_DELAY = timedelta(seconds=30)
 POST_COMMAND_REFRESH_DELAY = timedelta(seconds=20)
 
 MANUFACTURER = "MG Motor India"
+
+# When MG refuses a request outright (e.g. "result 7"), wait this long before
+# asking again so repeated requests do not make it worse.
+REJECTED_BACKOFF_MIN = 60
+
+# Sync status sensor states.
+SYNC_PAUSED = "paused"
+SYNC_SCHEDULED = "scheduled"
+SYNC_CONNECTING = "connecting"
+SYNC_WAITING = "waiting_for_car"
+SYNC_OK = "up_to_date"
+SYNC_NO_RESPONSE = "car_not_responding"
+SYNC_REJECTED = "rejected"
+SYNC_LOGIN_FAILED = "login_failed"
+SYNC_ERROR = "error"
+SYNC_COMMAND = "sending_command"
+SYNC_TIMED_OUT = "timed_out"
+SYNC_STATES = [
+    SYNC_TIMED_OUT,
+    SYNC_COMMAND,
+    SYNC_PAUSED,
+    SYNC_SCHEDULED,
+    SYNC_CONNECTING,
+    SYNC_WAITING,
+    SYNC_OK,
+    SYNC_NO_RESPONSE,
+    SYNC_REJECTED,
+    SYNC_LOGIN_FAILED,
+    SYNC_ERROR,
+]
