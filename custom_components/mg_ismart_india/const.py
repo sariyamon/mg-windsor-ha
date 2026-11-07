@@ -10,10 +10,21 @@ CONF_PHONE = "phone"
 CONF_VIN = "vin"
 CONF_PIN_HASH = "pin_hash"
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_ACTIVE_INTERVAL = "active_scan_interval"
 
-DEFAULT_SCAN_INTERVAL_MIN = 10
-MIN_SCAN_INTERVAL_MIN = 5
-MAX_SCAN_INTERVAL_MIN = 120
+# Every poll makes MG's server wake the car's telematics unit (T-Box), which
+# runs from the 12 V battery. Polling a parked car too often can drain it.
+# Parked: 30 min is the recommended balance; never below 15.
+DEFAULT_SCAN_INTERVAL_MIN = 30
+MIN_SCAN_INTERVAL_MIN = 15
+MAX_SCAN_INTERVAL_MIN = 240
+# Charging or A/C running: the car is awake anyway, so polling costs nothing extra.
+DEFAULT_ACTIVE_INTERVAL_MIN = 10
+MIN_ACTIVE_INTERVAL_MIN = 5
+MAX_ACTIVE_INTERVAL_MIN = 60
+# 12 V battery saver: below this voltage, slow down to protect the battery.
+LOW_12V_THRESHOLD = 12.2
+LOW_12V_INTERVAL_MIN = 120
 
 # After a remote command, give the car a moment before re-reading its status.
 POST_COMMAND_REFRESH_DELAY = timedelta(seconds=20)

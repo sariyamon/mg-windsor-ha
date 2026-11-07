@@ -44,12 +44,15 @@
     "step": {
       "init": {
         "title": "MG iSMART India options",
+        "description": "Every refresh wakes the car's telematics unit, which runs from the 12 V battery. Refreshing a parked car too often can drain that battery and leave the car unable to start.\n\n**Recommended:** parked 30 min, charging / A/C on 10 min. Values below these are not recommended. If the 12 V battery drops below 12.2 V, refresh automatically slows to every 2 hours until it recovers.",
         "data": {
-          "scan_interval": "Refresh every (minutes)",
+          "scan_interval": "Refresh while parked (minutes)",
+          "active_scan_interval": "Refresh while charging or A/C is on (minutes)",
           "pin": "New 4-digit app PIN (leave empty to keep the current one)"
         },
         "data_description": {
-          "scan_interval": "Each refresh wakes the car's telematics unit; 10 minutes is a good balance."
+          "scan_interval": "Recommended 30 (minimum 15). Longer is gentler on the 12 V battery; 60 is ideal if the car is parked for days.",
+          "active_scan_interval": "Recommended 10. The car is already awake while charging or cooling, so this costs no extra battery."
         }
       }
     },

@@ -132,8 +132,53 @@ async def test_options_set_pin_and_interval(hass: HomeAssistant, mock_client) ->
     entry = await _setup(hass, pin=False)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"scan_interval": 15, CONF_PIN: "4321"}
+        result["flow_id"],
+        {"scan_interval": 45, "active_scan_interval": 10, CONF_PIN: "4321"},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options["scan_interval"] == 15
+    assert entry.options["scan_interval"] == 45
+    assert entry.options["active_scan_interval"] == 10
     assert len(entry.data[CONF_PIN_HASH]) == 32
+
+
+def _interval(entry) -> int:
+    return int(entry.runtime_data.update_interval.total_seconds() // 60)
+
+
+async def test_interval_parked_default(hass: HomeAssistant, mock_client) -> None:
+    mock_client.status.return_value = make_status(charge=None)
+    entry = await _setup(hass)
+    assert _interval(entry) == 30
+
+
+async def test_interval_fast_while_charging(hass: HomeAssistant, mock_client) -> None:
+    entry = await _setup(hass)  # default status is charging
+    assert _interval(entry) == 10
+
+
+async def test_interval_fast_while_ac_on(hass: HomeAssistant, mock_client) -> None:
+    mock_client.status.return_value = make_status(charge=None, climate_running=True)
+    entry = await _setup(hass)
+    assert _interval(entry) == 10
+
+
+async def test_low_12v_battery_saver(hass: HomeAssistant, mock_client) -> None:
+    mock_client.status.return_value = make_status(charge=None, aux_battery_voltage=11.9)
+    entry = await _setup(hass)
+    assert _interval(entry) == 120
+    assert entry.runtime_data.battery_saver is True
+    # Recovers once the voltage is healthy again.
+    mock_client.status.return_value = make_status(charge=None, aux_battery_voltage=12.6)
+    await entry.runtime_data.async_refresh()
+    assert _interval(entry) == 30
+    assert entry.runtime_data.battery_saver is False
+
+
+async def test_old_short_interval_clamped(hass: HomeAssistant, mock_client) -> None:
+    mock_client.status.return_value = make_status(charge=None)
+    data = {CONF_PHONE: "9876543210", CONF_PASSWORD: "secret", CONF_VIN: VIN}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=VIN, data=data, options={"scan_interval": 5})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _interval(entry) == 15

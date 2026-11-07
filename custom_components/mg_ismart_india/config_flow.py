@@ -33,18 +33,32 @@ from mg_ismart_india_client import (
 from mg_ismart_india_client.crypto import normalize_phone
 
 from .const import (
+    CONF_ACTIVE_INTERVAL,
     CONF_PHONE,
     CONF_PIN_HASH,
     CONF_SCAN_INTERVAL,
     CONF_VIN,
+    DEFAULT_ACTIVE_INTERVAL_MIN,
     DEFAULT_SCAN_INTERVAL_MIN,
     DOMAIN,
+    MAX_ACTIVE_INTERVAL_MIN,
     MAX_SCAN_INTERVAL_MIN,
+    MIN_ACTIVE_INTERVAL_MIN,
     MIN_SCAN_INTERVAL_MIN,
 )
+
 from .coordinator import MgConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _minutes(low: int, high: int) -> NumberSelector:
+    return NumberSelector(
+        NumberSelectorConfig(
+            min=low, max=high, step=1, unit_of_measurement="min",
+            mode=NumberSelectorMode.BOX,
+        )
+    )
 
 _PASSWORD = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 
@@ -207,24 +221,31 @@ class MgOptionsFlow(OptionsFlowWithReload):
                     )
             if not errors:
                 return self.async_create_entry(
-                    data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
+                    data={
+                        CONF_SCAN_INTERVAL: max(
+                            int(user_input[CONF_SCAN_INTERVAL]), MIN_SCAN_INTERVAL_MIN
+                        ),
+                        CONF_ACTIVE_INTERVAL: max(
+                            int(user_input[CONF_ACTIVE_INTERVAL]),
+                            MIN_ACTIVE_INTERVAL_MIN,
+                        ),
+                    }
                 )
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_SCAN_INTERVAL,
-                    default=entry.options.get(
-                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MIN
+                    default=max(
+                        int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MIN)),
+                        MIN_SCAN_INTERVAL_MIN,
                     ),
-                ): NumberSelector(
-                    NumberSelectorConfig(
-                        min=MIN_SCAN_INTERVAL_MIN,
-                        max=MAX_SCAN_INTERVAL_MIN,
-                        step=1,
-                        unit_of_measurement="min",
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
+                ): _minutes(MIN_SCAN_INTERVAL_MIN, MAX_SCAN_INTERVAL_MIN),
+                vol.Required(
+                    CONF_ACTIVE_INTERVAL,
+                    default=entry.options.get(
+                        CONF_ACTIVE_INTERVAL, DEFAULT_ACTIVE_INTERVAL_MIN
+                    ),
+                ): _minutes(MIN_ACTIVE_INTERVAL_MIN, MAX_ACTIVE_INTERVAL_MIN),
                 vol.Optional(CONF_PIN): _PASSWORD,
             }
         )
