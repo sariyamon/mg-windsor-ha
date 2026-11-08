@@ -65,14 +65,15 @@ Change the intervals under **Settings → Devices & services → MG iSMART India
 
 ## Dashboard cards
 
-The integration comes with five ready-made cards, one for each section of a car view. They load automatically, with no extra download or resource to add.
+The integration comes with ready-made cards: a compact summary for a home dashboard, plus one card for each section of a car view. They load automatically, with no extra download or resource to add.
 
 **Edit dashboard → Add card → search "MG car"**, then pick the one you want:
 
 | Card | Shows |
 |---|---|
+| **MG car summary** | Compact card for a home dashboard: battery bar, range, doors (lock / unlock), A/C and a **Sync** button, with lock, charging and "Sync paused" badges |
 | **MG car overview** | Battery gauge, range, energy in the pack, charger and charging; charging power and "Full at" only while charging |
-| **MG car controls** | Cloud sync switch, sync status and details, door lock, air conditioning, Find my car (asks first) and Refresh now |
+| **MG car controls** | Cloud sync switch, sync status and details, door lock, air conditioning, Find my car (asks first) and Sync now |
 | **MG car status** | Doors, windows, boot, bonnet, cabin and outside temperature |
 | **MG car health** | Tyre pressures, 12 V battery, odometer |
 | **MG car location** | Map of the car's last GPS position |
@@ -85,6 +86,9 @@ Each card finds the car's entities by itself, so there are no entity IDs to fill
 | `title` | all | the car's name, Controls, Status, Health, Location |
 | `show_details` | controls | on (the Details, Last successful sync and Next refresh rows) |
 | `default_zoom` | location | 15 |
+| `navigation_path` | summary | none; e.g. `/lovelace/car` opens your car view when the heading, battery or range is tapped |
+
+**The Sync button.** While cloud sync is on, it asks the car for fresh status straight away (the same as *Refresh status*). While sync is paused, it shows a cloud-off icon. Tapping it then asks before turning cloud sync back on and syncing, because MG allows one login per account and syncing logs the phone app out. Hold the button for the sync details.
 
 A whole Car view made of these cards: [examples/car-cards.yaml](examples/car-cards.yaml).
 

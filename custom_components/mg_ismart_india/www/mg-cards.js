@@ -1,7 +1,8 @@
 /*
  * MG iSMART India dashboard cards.
  *
- * Five ready-made cards, one per section of a car view:
+ * Ready-made cards, one per section of a car view:
+ *   custom:mg-car-summary-card    compact: battery, range, doors, A/C and a Sync button
  *   custom:mg-car-overview-card   battery gauge, range, energy, charger and charging
  *   custom:mg-car-controls-card   cloud sync, sync details, lock, air conditioning, find my car, refresh
  *   custom:mg-car-status-card     doors, windows, boot, bonnet, cabin and outside temperature
@@ -13,7 +14,7 @@
  * Pick them from "Add card" -> "MG car ..."; no YAML needed.
  */
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const DOMAIN = "mg_ismart_india";
 const DOCS = "https://github.com/sariyamon/mg-windsor-ha#dashboard-cards";
 
@@ -75,7 +76,7 @@ function tiles(e, rows) {
   return rows.filter(([key]) => e[key]).map(([key, name, icon, color, extra]) => tile(e[key], name, icon, color, extra));
 }
 
-/* ---------- the five cards ---------- */
+/* ---------- the cards ---------- */
 
 const press = (entity, confirm) => ({
   action: "perform-action",
@@ -86,7 +87,74 @@ const press = (entity, confirm) => ({
 
 const half = { grid_options: { columns: 6 } };
 
+/**
+ * One Sync button for both states of cloud sync:
+ * paused  -> turns cloud sync on (asks first: it logs the MG phone app out), which syncs at once;
+ * running -> asks the car for fresh status now.
+ */
+function syncTiles(e, name = "Sync") {
+  const out = [];
+  if (e.cloud_sync) {
+    out.push(when(e.cloud_sync, false, tile(e.sync_status || e.cloud_sync, name, "mdi:cloud-off-outline", "grey", {
+      tap_action: {
+        action: "perform-action",
+        perform_action: "switch.turn_on",
+        target: { entity_id: e.cloud_sync },
+        confirmation: { text: "Turn cloud sync on and sync now? MG allows one login, so this logs the phone app out." },
+      },
+      hold_action: { action: "more-info", entity: e.sync_status || e.cloud_sync },
+    })));
+  }
+  if (e.refresh) {
+    const t = tile(e.sync_status || e.refresh, name, "mdi:sync", "blue", {
+      tap_action: press(e.refresh),
+      hold_action: { action: "more-info", entity: e.sync_status || e.refresh },
+    });
+    out.push(e.cloud_sync ? when(e.cloud_sync, true, t) : t);
+  }
+  return out;
+}
+
 const CARDS = {
+  "mg-car-summary-card": {
+    name: "MG car summary",
+    description: "Compact: battery, range, doors, A/C and a Sync button, with lock and charging badges.",
+    schema: [
+      { name: "title", selector: { text: {} } },
+      { name: "navigation_path", selector: { text: {} } },
+    ],
+    build(config, e, device) {
+      const go = config.navigation_path ? { action: "navigate", navigation_path: config.navigation_path } : null;
+      const badges = [];
+      if (e.cloud_sync)
+        badges.push({
+          type: "entity", entity: e.cloud_sync, name: "Sync paused", show_name: true, show_state: false, show_icon: true, color: "grey",
+          visibility: [{ condition: "state", entity: e.cloud_sync, state: "off" }],
+        });
+      if (e.door_lock) badges.push({ type: "entity", entity: e.door_lock, show_state: true, show_icon: true });
+      if (e.charging)
+        badges.push({
+          type: "entity", entity: e.charging, show_state: true, show_icon: true, color: "green",
+          visibility: [{ condition: "state", entity: e.charging, state: "on" }],
+        });
+      const head = heading(config.title || device.name, "mdi:car-electric", badges);
+      if (go) head.tap_action = go;
+      const nav = go ? { tap_action: go } : {};
+      return [
+        head,
+        grid(2, [
+          ...tiles(e, [
+            ["battery", "Battery", null, "green", { ...nav, features: [{ type: "bar-gauge", min: 0, max: 100 }] }],
+            ["range", "Range", null, null, nav],
+            ["door_lock", "Doors", null, null, { features: [{ type: "lock-commands" }] }],
+            ["climate", "A/C", null, null, { features: [{ type: "toggle" }] }],
+          ]),
+          ...syncTiles(e),
+        ]),
+      ];
+    },
+  },
+
   "mg-car-overview-card": {
     name: "MG car overview",
     description: "Battery gauge, range, energy in the pack, charger and charging details.",
@@ -156,8 +224,8 @@ const CARDS = {
         ["find_my_car", "Find my car", "mdi:car-search", "Flash the lights and sound the horn?"],
         ["tailgate", "Open boot", "mdi:car-back", "Open the boot?"],
         ["windows_close", "Close windows", "mdi:car-door", null],
-        ["refresh", "Refresh now", "mdi:refresh", null],
       ].filter(([k]) => e[k]).map(([k, name, icon, confirm]) => tile(e[k], name, icon, null, { hide_state: true, tap_action: press(e[k], confirm) }));
+      buttons.push(...syncTiles(e, "Sync now"));
       if (buttons.length) cards.push(grid(2, buttons));
       return cards;
     },
@@ -221,6 +289,7 @@ const LABELS = {
   device: "Car",
   title: "Title",
   show_details: "Show sync details",
+  navigation_path: "Open this view when tapped (e.g. /lovelace/car)",
   default_zoom: "Map zoom",
 };
 
