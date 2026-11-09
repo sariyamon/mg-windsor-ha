@@ -401,7 +401,7 @@ async def test_sync_status_paused(hass: HomeAssistant, mock_client) -> None:
     await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
     st = hass.states.get("sensor.mg_windsor_sync_status")
     assert st.state == "paused"
-    assert st.attributes["next_refresh"] is None
+    assert "next_refresh" not in st.attributes
 
 
 async def test_sync_timeout(hass: HomeAssistant, mock_client) -> None:
@@ -500,3 +500,21 @@ def test_cards_file_is_shipped() -> None:
     text = CARDS_FILE.read_text()
     for tag in ("overview", "controls", "status", "health", "location"):
         assert f'"mg-car-{tag}-card"' in text
+
+
+async def test_sync_times_never_none(hass: HomeAssistant, mock_client) -> None:
+    """Unknown times are left out (a None shows as "56 years ago" on dashboards)."""
+    entry = await _setup(hass)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
+    attrs = hass.states.get("sensor.mg_windsor_sync_status").attributes
+    assert "next_refresh" not in attrs
+    assert all(attrs.get(k) is not None for k in ("last_success",) if k in attrs)
+    # The last sync time is restored after a restart.
+    synced = entry.runtime_data.last_success
+    assert synced is not None
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=10))  # let the cache save
+    await hass.async_block_till_done()
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.last_success is not None
+    assert "last_success" in hass.states.get("sensor.mg_windsor_sync_status").attributes

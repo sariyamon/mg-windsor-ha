@@ -8,9 +8,11 @@ in to MG just to draw it.
 from __future__ import annotations
 
 from dataclasses import asdict, fields
+from datetime import datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.storage import Store
 from mg_ismart_india_client import (
     Capabilities,
@@ -89,11 +91,13 @@ class SnapshotCache:
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}.last_snapshot"
         )
+        self.saved_at: datetime | None = None  # when that snapshot was synced
 
     async def async_load(self) -> Snapshot | None:
         data = await self._store.async_load()
         if not data:
             return None
+        self.saved_at = dt_util.parse_datetime(data.get("saved_at") or "")
         try:
             return deserialize(data)
         except (KeyError, TypeError, ValueError):
@@ -101,6 +105,7 @@ class SnapshotCache:
 
     def save(self, snapshot: Snapshot) -> None:
         data = serialize(snapshot)
+        data["saved_at"] = dt_util.utcnow().isoformat()
         self._store.async_delay_save(lambda: data, 5)
 
     async def async_remove(self) -> None:

@@ -14,7 +14,7 @@
  * Pick them from "Add card" -> "MG car ..."; no YAML needed.
  */
 
-const VERSION = "1.6.0";
+const VERSION = "1.6.1";
 const DOMAIN = "mg_ismart_india";
 const DOCS = "https://github.com/sariyamon/mg-windsor-ha#dashboard-cards";
 
@@ -201,12 +201,7 @@ const CARDS = {
           state_color: true,
           entities: [
             row("message", "Details", "mdi:message-alert-outline"),
-            // Times are blank while paused (and before the first sync); a blank time would read "56 years ago".
-            {
-              type: "conditional",
-              conditions: [{ condition: "state", entity: e.sync_status, state_not: "paused" }],
-              row: row("last_success", "Last successful sync", "mdi:check-circle-outline", "relative"),
-            },
+            row("last_success", "Last successful sync", "mdi:check-circle-outline", "relative"),
             {
               type: "conditional",
               conditions: [{ condition: "state", entity: e.sync_status, state_not: "paused" }],

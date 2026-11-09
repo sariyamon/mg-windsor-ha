@@ -109,6 +109,7 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
         self.last_success: datetime | None = None
         self.last_error: str | None = None
         self.rejected_backoff = False
+        self.first_refresh_at: datetime | None = None  # the delayed first sync after start-up
         super().__init__(
             hass,
             _LOGGER,
@@ -211,8 +212,10 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
 
     @property
     def next_refresh(self) -> datetime | None:
-        if self.paused or self.update_interval is None or self.last_attempt is None:
+        if self.paused or self.update_interval is None:
             return None
+        if self.last_attempt is None:
+            return self.first_refresh_at
         return self.last_attempt + self.update_interval
 
     def _keep_or_fail(self, state: str, message: str, err: Exception) -> Snapshot:

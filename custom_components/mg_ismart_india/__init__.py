@@ -11,6 +11,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
+from homeassistant.util import dt as dt_util
 from mg_ismart_india_client import Capabilities, Snapshot, Status, Vehicle
 
 from .cache import SnapshotCache
@@ -55,7 +56,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MgConfigEntry) -> bool:
     # happens. Otherwise the first contact with MG waits STARTUP_REFRESH_DELAY,
     # leaving time to switch Cloud sync off before any login is made.
     coordinator.data = cached or _placeholder(entry)
+    coordinator.last_success = coordinator.cache.saved_at  # survives restarts
     if not coordinator.paused:
+        coordinator.first_refresh_at = dt_util.utcnow() + STARTUP_REFRESH_DELAY
 
         async def _first_refresh(_now: Any) -> None:
             if not coordinator.paused:

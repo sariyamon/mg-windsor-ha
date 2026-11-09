@@ -339,7 +339,7 @@ class MgSyncStatusSensor(MgEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         c = self.coordinator
-        return {
+        attrs = {
             "last_attempt": c.last_attempt,
             "last_success": c.last_success,
             "next_refresh": c.next_refresh,
@@ -349,3 +349,9 @@ class MgSyncStatusSensor(MgEntity, SensorEntity):
             else int(c.update_interval.total_seconds() // 60),
             "battery_saver": c.battery_saver,
         }
+        # Leave unknown times out rather than None: dashboards turn None into
+        # 1 Jan 1970 ("56 years ago"), while a missing value shows as "—".
+        for key in ("last_attempt", "last_success", "next_refresh"):
+            if attrs[key] is None:
+                del attrs[key]
+        return attrs
