@@ -14,7 +14,7 @@
  * Pick them from "Add card" -> "MG car ..."; no YAML needed.
  */
 
-const VERSION = "1.5.2";
+const VERSION = "1.6.0";
 const DOMAIN = "mg_ismart_india";
 const DOCS = "https://github.com/sariyamon/mg-windsor-ha#dashboard-cards";
 
@@ -89,54 +89,23 @@ const half = { grid_options: { columns: 6 } };
 
 /**
  * One Sync button for both states of cloud sync:
- * paused  -> turns cloud sync on (asks first: it logs the MG phone app out), which syncs at once;
- * running -> asks the car for fresh status now.
+ * running -> asks the car for fresh status now;
+ * paused  -> syncs this one time (asks first: it logs the MG phone app out) and
+ *            leaves cloud sync off afterwards.
  */
-/**
- * Cloud sync on/off, as a tap with a confirmation (same as the Sync button) rather than
- * a slider: turning it on logs the MG phone app out, so it should never happen by accident.
- */
-function cloudSyncTiles(e) {
-  if (!e.cloud_sync) return [];
-  const action = (service, text) => ({
-    action: "perform-action",
-    perform_action: `switch.${service}`,
-    target: { entity_id: e.cloud_sync },
-    confirmation: { text },
-  });
-  return [
-    when(e.cloud_sync, false, tile(e.cloud_sync, "Cloud sync", "mdi:cloud-off-outline", "grey", {
-      tap_action: action("turn_on", "Turn cloud sync on and sync now? MG allows one login, so this logs the phone app out."),
-      hold_action: { action: "more-info" },
-    })),
-    when(e.cloud_sync, true, tile(e.cloud_sync, "Cloud sync", "mdi:cloud-sync", "blue", {
-      tap_action: action("turn_off", "Pause cloud sync? Home Assistant stops contacting MG and you can use the phone app again."),
-      hold_action: { action: "more-info" },
-    })),
-  ];
-}
-
 function syncTiles(e, name = "Sync") {
-  const out = [];
-  if (e.cloud_sync) {
-    out.push(when(e.cloud_sync, false, tile(e.sync_status || e.cloud_sync, name, "mdi:cloud-off-outline", "grey", {
-      tap_action: {
-        action: "perform-action",
-        perform_action: "switch.turn_on",
-        target: { entity_id: e.cloud_sync },
-        confirmation: { text: "Turn cloud sync on and sync now? MG allows one login, so this logs the phone app out." },
-      },
-      hold_action: { action: "more-info", entity: e.sync_status || e.cloud_sync },
-    })));
-  }
-  if (e.refresh) {
-    const t = tile(e.sync_status || e.refresh, name, "mdi:sync", "blue", {
-      tap_action: press(e.refresh),
-      hold_action: { action: "more-info", entity: e.sync_status || e.refresh },
-    });
-    out.push(e.cloud_sync ? when(e.cloud_sync, true, t) : t);
-  }
-  return out;
+  if (!e.refresh) return [];
+  const info = { action: "more-info", entity: e.sync_status || e.refresh };
+  const running = tile(e.sync_status || e.refresh, name, "mdi:sync", "blue", { tap_action: press(e.refresh), hold_action: info });
+  if (!e.cloud_sync) return [running];
+  const once = tile(e.sync_status || e.refresh, name, "mdi:cloud-download-outline", "grey", {
+    tap_action: press(
+      e.refresh,
+      "Sync once now? Cloud sync stays off afterwards. MG allows one login, so this logs the phone app out."
+    ),
+    hold_action: info,
+  });
+  return [when(e.cloud_sync, false, once), when(e.cloud_sync, true, running)];
 }
 
 const CARDS = {

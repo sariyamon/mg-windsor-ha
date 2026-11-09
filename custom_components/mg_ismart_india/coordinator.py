@@ -172,6 +172,31 @@ class MgCoordinator(DataUpdateCoordinator[Snapshot]):
             _LOGGER.info("MG cloud sync resumed")
             await self.async_request_refresh()
 
+    async def async_sync_once(self) -> None:
+        """Sync now. If cloud sync is off, sync this one time and leave it off afterwards."""
+        if self.busy:
+            return  # already syncing; the result will show when it finishes
+        if not self.paused:
+            await self.async_refresh()
+            return
+        _LOGGER.info("MG one-time sync while cloud sync is off")
+        self.paused = False  # in memory only: the saved setting stays "off"
+        self.rejected_backoff = False
+        try:
+            await self.async_refresh()
+        finally:
+            self.paused = True
+            self.update_interval = None
+            if self._cancel_refresh:
+                self._cancel_refresh()
+                self._cancel_refresh = None
+            unsub = getattr(self, "_async_unsub_refresh", None)
+            if callable(unsub):
+                unsub()
+            if self.sync_state == SYNC_OK:
+                self.sync_state = SYNC_PAUSED  # result is in last_success / the message
+            self.async_update_listeners()
+
     def _ensure_active(self, label: str) -> None:
         if self.paused:
             raise HomeAssistantError(

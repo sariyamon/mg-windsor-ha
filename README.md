@@ -88,7 +88,7 @@ Each card finds the car's entities by itself, so there are no entity IDs to fill
 | `default_zoom` | location | 15 |
 | `navigation_path` | summary | none; e.g. `/lovelace/car` opens your car view when the heading, battery or range is tapped |
 
-**The Sync button.** While cloud sync is on, it asks the car for fresh status straight away (the same as *Refresh status*). While sync is paused, it shows a cloud-off icon. Tapping it then asks before turning cloud sync back on and syncing, because MG allows one login per account and syncing logs the phone app out. Hold the button for the sync details.
+**The Sync button.** While cloud sync is on, it asks the car for fresh status straight away. While sync is off, it does a **one-time sync**: it asks first (MG allows one login per account, so syncing logs the phone app out), syncs once, and leaves cloud sync off afterwards, with no further contact with MG. Hold the button for the sync details.
 
 A whole Car view made of these cards: [examples/car-cards.yaml](examples/car-cards.yaml).
 

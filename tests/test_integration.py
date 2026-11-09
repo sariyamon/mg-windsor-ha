@@ -252,9 +252,20 @@ async def test_pause_stops_all_contact(hass: HomeAssistant, mock_client) -> None
     assert hass.states.get("sensor.mg_windsor_battery").state == "72.0"  # last value kept
     with pytest.raises(HomeAssistantError, match="paused"):
         await hass.services.async_call("lock", "unlock", {"entity_id": "lock.mg_windsor_doors"}, blocking=True)
-    with pytest.raises(HomeAssistantError, match="paused"):
-        await hass.services.async_call("button", "press", {"entity_id": "button.mg_windsor_refresh_status"}, blocking=True)
     mock_client.control_door_lock.assert_not_called()
+    # Sync now while paused: one sync, then cloud sync stays off with no schedule.
+    await hass.services.async_call("button", "press", {"entity_id": "button.mg_windsor_refresh_status"}, blocking=True)
+    await hass.async_block_till_done()
+    assert mock_client.status.await_count == calls + 1
+    assert entry.options["sync_paused"] is True
+    assert hass.states.get("switch.mg_windsor_cloud_sync").state == "off"
+    st = hass.states.get("sensor.mg_windsor_sync_status")
+    assert st.state == "paused"
+    assert st.attributes["message"].startswith("Cloud sync is off. Last synced ")
+    assert await _count_refreshes(hass, entry, 3600) == 0
+    with pytest.raises(HomeAssistantError, match="paused"):
+        await hass.services.async_call("lock", "unlock", {"entity_id": "lock.mg_windsor_doors"}, blocking=True)
+    calls = mock_client.status.await_count
     # Resume refreshes straight away.
     await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.mg_windsor_cloud_sync"}, blocking=True)
     await hass.async_block_till_done()

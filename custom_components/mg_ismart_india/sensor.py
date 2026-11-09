@@ -328,6 +328,14 @@ class MgSyncStatusSensor(MgEntity, SensorEntity):
     def icon(self) -> str:
         return _SYNC_ICONS.get(self.coordinator.sync_state, "mdi:cloud-question-outline")
 
+    def _message(self) -> str:
+        c = self.coordinator
+        text = sync_message(c.sync_state, c.last_error)
+        if c.sync_state == SYNC_PAUSED and c.last_success:
+            when = dt_util.as_local(c.last_success).strftime("%-d %b, %H:%M")
+            text = f"Cloud sync is off. Last synced {when}. Press Sync now to sync once."
+        return text
+
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         c = self.coordinator
@@ -335,7 +343,7 @@ class MgSyncStatusSensor(MgEntity, SensorEntity):
             "last_attempt": c.last_attempt,
             "last_success": c.last_success,
             "next_refresh": c.next_refresh,
-            "message": sync_message(c.sync_state, c.last_error),
+            "message": self._message(),
             "refresh_interval_min": None
             if c.update_interval is None
             else int(c.update_interval.total_seconds() // 60),

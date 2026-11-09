@@ -76,12 +76,12 @@ class MgRefreshButton(MgEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         # Asking a sleeping car can take a minute; return at once and let the
-        # entities update when the answer arrives.
-        self.coordinator._ensure_active("Refresh")
+        # entities update when the answer arrives. With cloud sync off this is a
+        # one-time sync and cloud sync stays off afterwards.
         if self.coordinator.busy:
             return  # already syncing; the result will show when it finishes
         self.coordinator.config_entry.async_create_background_task(
-            self.hass, self.coordinator.async_refresh(), "mg_ismart_india manual refresh"
+            self.hass, self.coordinator.async_sync_once(), "mg_ismart_india manual refresh"
         )
 
 
