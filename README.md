@@ -73,7 +73,7 @@ The integration comes with ready-made cards: a compact summary for a home dashbo
 |---|---|
 | **MG car summary** | Compact card for a home dashboard: battery bar, range, doors (lock / unlock), A/C and a **Sync** button, with lock, charging and "Sync paused" badges |
 | **MG car overview** | Battery gauge, range, energy in the pack, charger and charging; charging power and "Full at" only while charging |
-| **MG car controls** | Cloud sync switch, sync status and details, door lock, air conditioning, Find my car (asks first) and Sync now |
+| **MG car controls** | Cloud sync on/off (tap and confirm, like the Sync button), sync status and details, door lock, air conditioning, Find my car (asks first) and Sync now |
 | **MG car status** | Doors, windows, boot, bonnet, cabin and outside temperature |
 | **MG car health** | Tyre pressures, 12 V battery, odometer |
 | **MG car location** | Map of the car's last GPS position |
